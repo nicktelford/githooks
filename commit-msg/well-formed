@@ -1,0 +1,110 @@
+#!/bin/sh
+# Verifies the commit message is well-formed.
+# See: http://git-scm.com/book/en/v2/Distributed-Git-Contributing-to-a-Project
+
+commitfile="$1"
+errors=""
+
+error() {
+  if [ -z "$errors" ]; then
+    errors="$1"
+  else
+    errors="$errors\n$1"
+  fi
+}
+
+verify() {
+  if [ -n "$errors" ]; then
+    echo "Commit message is not well-formed:"
+    echo -e "$errors" | while IFS= read -r msg; do echo "- $msg"; done
+    echo "See: http://git-scm.com/book/en/v2/Distributed-Git-Contributing-to-a-Project#Commit-Guidelines"
+    exit 1
+  fi
+}
+
+lowercase() {
+  echo -ne "$@" | tr '[:upper:]' '[:lower:]'
+}
+
+titlecase() {
+  echo -ne "$@" | sed 's/.*/\L&/; s/[a-z]*/\u&/g'
+}
+
+summary=$(head -n1 $commitfile)
+first_word="$(echo -n "$summary" | cut -d' ' -f1)"
+
+# Rule 1. Summary is not empty
+if [ -z "$summary" ]; then
+  error "Summary line must not be empty."
+fi
+
+# Rule 2. Summary is no longer than 50 characters
+if [ "${#summary}" -gt 50 ]; then
+  error "Summary line must not be more than 50 characters."
+fi
+
+# Rule 3. Summary must end with a full-stop (.)
+if [ "." == "$(echo -ne "$summary" | tail -c1)" ]; then
+  error "Summary line must not end with a full-stop (.) character."
+fi
+
+# Rule 4. Summary must start with a capital letter
+if [ 0 -eq $(expr "$first_word" : "[A-Z]*") ]; then
+  error "Summary must start with a capital letter; '$(titlecase "$first_word")', not '$first_word'"
+fi
+
+# Rule 5. Summary must be written as a sentence
+if [ ":" == "$(echo -n "$first_word" | tail -c1)" ]; then
+  bad=$(titlecase "$first_word")
+  first_word="$(echo -n "$first_word" | head -c-1)"
+  good=$(titlecase "$first_word")
+  error "Summary must be written as a sentence, without the colon (:) character; '$good', not '$bad'"
+fi
+
+# Rule 6. Summary must start with an imperative verb
+verbs="
+fix fixes fixing fixed
+add adds adding adds
+create creates creating created
+modify modifys modifying modified
+edit edits editing edited
+change changes changing changed
+delete deletes deleting deleted
+remove removes removing removed
+kill kills killing killed
+"
+
+#echo -e "$verbs" | while IFS= read -r line; do
+first_word="$(lowercase "$first_word")"
+IFS=$'\n'
+for line in $verbs; do
+  good="$(titlecase "$(echo -n "$line" | cut -d' ' -f1)")"
+  IFS=" "
+  for bad in $(echo -n "$line" | cut -d' ' -f2-); do
+    if [ "$first_word" == "$bad" ]; then
+      error "Summary must be in the imperative tense; '$good', not '$(titlecase "$bad")'."
+      break 2
+    fi
+  done
+done
+
+# Rule 7. Second line must be blank
+if [ -n "$(head -n2 $commitfile | tail -n1)" ]; then
+  error "Second line must be empty."
+fi
+
+# Rule 8. Description lines are no longer than 72 characters
+desc="$(grep -v "^#" $commitfile | tail -n+3)"
+IFS=$'\n'
+for line in $desc; do
+  if [ "${#line}" -gt 72 ]; then
+    error "Description lines must not be more than 72 characters."
+  fi
+done
+
+# Rule 9. Description must start with a capital letter
+if [ 0 -eq $(expr "$desc" : "[A-Z]*") ]; then
+  error "Description must start with a capital letter"
+fi
+
+verify
