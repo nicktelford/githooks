@@ -99,6 +99,7 @@ IFS=$'\n'
 for line in $desc; do
   if [ "${#line}" -gt 72 ]; then
     error "Description lines must not be more than 72 characters."
+    break
   fi
 done
 
