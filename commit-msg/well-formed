@@ -94,7 +94,8 @@ if [ -n "$(head -n2 $commitfile | tail -n1)" ]; then
 fi
 
 # Rule 8. Description lines are no longer than 72 characters
-desc="$(grep -v "^#" $commitfile | tail -n+3)"
+# Note: URLs are permitted to exceed the line length
+desc="$(grep -v "^#" $commitfile | grep -v "https\{,1\}://[^[:space:]]*$" | tail -n+3)"
 IFS=$'\n'
 for line in $desc; do
   if [ "${#line}" -gt 72 ]; then
